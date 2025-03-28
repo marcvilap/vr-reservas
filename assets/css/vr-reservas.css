@@ -1,0 +1,73 @@
+#vr-reserva-form {
+  max-width: 500px;
+  margin: 2rem auto;
+  padding: 2rem;
+  border: 2px solid #ccc;
+  border-radius: 12px;
+  background-color: #f9f9f9;
+  font-family: sans-serif;
+}
+
+#vr-reserva-form label {
+  display: block;
+  margin-top: 1rem;
+  font-weight: bold;
+}
+
+#vr-reserva-form input,
+#vr-reserva-form select,
+#vr-reserva-form button {
+  width: 100%;
+  padding: 0.5rem;
+  margin-top: 0.3rem;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  box-sizing: border-box;
+}
+
+#vr-reserva-form button {
+  background-color: #1e88e5;
+  color: white;
+  font-weight: bold;
+  margin-top: 1.5rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+#vr-reserva-form button:hover {
+  background-color: #1565c0;
+}
+
+#precio-estimado {
+  margin-top: 1rem;
+  font-weight: bold;
+  color: #1e88e5;
+}
+
+/* Tags de hora */
+.vr-horas-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+
+  gap: 10px;
+  margin-top: 0.5rem;
+}
+
+.vr-hora-tag {
+  background: #eee;
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+  border: 1px solid #ccc;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.vr-hora-tag:hover {
+  background: #ddd;
+}
+
+.vr-hora-tag.selected {
+  background-color: #1e88e5;
+  color: white;
+  border-color: #1e88e5;
+}
