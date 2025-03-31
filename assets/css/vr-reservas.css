@@ -1,5 +1,5 @@
 #vr-reserva-form {
-  max-width: 500px;
+  max-width: 50rem;
   margin: 2rem auto;
   padding: 2rem;
   border: 2px solid #ccc;
@@ -26,16 +26,20 @@
 }
 
 #vr-reserva-form button {
-  background-color: #1e88e5;
+  background-color: #181818;
   color: white;
   font-weight: bold;
-  margin-top: 1.5rem;
+
   cursor: pointer;
   transition: background-color 0.2s ease;
 }
 
 #vr-reserva-form button:hover {
   background-color: #1565c0;
+}
+
+#vr-reserva-form button.selected {
+  background-color: #0047ff;
 }
 
 #precio-estimado {
@@ -47,7 +51,8 @@
 /* Tags de hora */
 .vr-horas-container {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
+  font-size: 0.9rem;
 
   gap: 10px;
   margin-top: 0.5rem;

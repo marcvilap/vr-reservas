@@ -41,11 +41,12 @@ jQuery(document).ready(function ($) {
 
           if (response && response.length > 0) {
             response.forEach((h) => {
+              const texto = `${h.hora}<br><small>Quedan ${h.plazas} plazas </small>`;
               const btn = $("<button>")
                 .addClass("vr-hora-tag")
                 .attr("type", "button")
-                .attr("data-value", h)
-                .text(h);
+                .attr("data-value", h.hora)
+                .html(texto);
 
               contenedor.append(btn);
             });
@@ -73,15 +74,30 @@ jQuery(document).ready(function ($) {
 
     const dia = new Date(fecha).getDay();
     const tarifaSemana = 20;
-    const tarifaFinde = 25;
+    const tarifaFinde = 26;
     const esFinde = dia === 5 || dia === 6 || dia === 0;
     const tarifa = esFinde ? tarifaFinde : tarifaSemana;
 
     let facturados = jugadores;
     if (tipo === "privada") {
-      if (jugadores <= 4) facturados = 4;
-      else if (jugadores <= 8) facturados = 8;
-      else facturados = 12;
+      const capacidades = [];
+      $(".vr-hora-tag").each(function () {
+        const texto = $(this).text();
+        const match = texto.match(/\((\d+) plazas disponibles\)/);
+        if (match) capacidades.push(parseInt(match[1]));
+      });
+
+      capacidades.sort((a, b) => a - b);
+      let restantes = jugadores;
+      let suma = 0;
+
+      for (let cap of capacidades) {
+        suma += cap;
+        if (suma >= jugadores) {
+          facturados = suma;
+          break;
+        }
+      }
     }
 
     const total = facturados * tarifa;

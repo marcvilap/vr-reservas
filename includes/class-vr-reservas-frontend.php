@@ -8,6 +8,28 @@ class VR_Reservas_Frontend {
         add_action('wp_ajax_nopriv_vr_obtener_horas_disponibles', [self::class, 'ajax_horas_disponibles']);
     }
 
+    public static function get_boxes_disponibles() {
+        $args = [
+            'post_type' => 'vr_box',
+            'posts_per_page' => -1,
+            'meta_key' => '_vr_box_activo',
+            'meta_value' => '1'
+        ];
+
+        $boxes = get_posts($args);
+        $resultado = [];
+
+        foreach ($boxes as $box) {
+            $capacidad = intval(get_post_meta($box->ID, '_vr_box_capacidad', true));
+            $resultado[$box->ID] = [
+                'nombre' => get_the_title($box->ID),
+                'capacidad' => $capacidad
+            ];
+        }
+
+        return $resultado;
+    }
+
     public static function mostrar_formulario() {
         ob_start();
         ?>
@@ -24,7 +46,7 @@ class VR_Reservas_Frontend {
     </select>
 
     <label for="jugadores">Número de jugadores:</label>
-    <input type="number" name="jugadores" id="jugadores" min="1" max="12" required>
+    <input type="number" name="jugadores" id="jugadores" min="1" required>
 
     <label for="tipo">Tipo de partida:</label>
     <select name="tipo" id="tipo" required>
@@ -32,14 +54,18 @@ class VR_Reservas_Frontend {
         <option value="privada">Privada</option>
     </select>
 
-    <label>Fecha:</label>
-    <div id="calendario-fecha"></div>
-    <input type="hidden" name="fecha" id="fecha" />
-
-    <label>Hora:</label>
-    <div id="contenedor-horas" class="vr-horas-container"></div>
-    <input type="hidden" name="hora" id="hora" />
-
+    <div style="display:flex; gap:2rem">
+        <div>
+            <label>Fecha:</label>
+            <div id="calendario-fecha"></div>
+            <input type="hidden" name="fecha" id="fecha" />
+        </div>
+        <div style="width:100%">
+            <label>Hora:</label>
+            <div id="contenedor-horas" class="vr-horas-container"></div>
+            <input type="hidden" name="hora" id="hora" />
+        </div>
+    </div>
     <div id="precio-estimado"></div>
 
     <button type="submit">Reservar ahora</button>
@@ -74,6 +100,9 @@ class VR_Reservas_Frontend {
         $fin = 20;
         $horas_disponibles = [];
 
+        $boxes_data = self::get_boxes_disponibles();
+        $box_ids = array_keys($boxes_data);
+
         for ($hora = $inicio; $hora <= $fin; $hora++) {
             $franja = sprintf('%02d:00', $hora);
 
@@ -87,10 +116,15 @@ class VR_Reservas_Frontend {
                 ]
             ]);
 
-            $capacidad = ['A' => 8, 'B' => 4];
-            $ocupacion = ['A' => 0, 'B' => 0];
-            $ocupacion_por_juego = ['A' => [], 'B' => []];
-            $privadas = ['A' => false, 'B' => false];
+            $ocupacion = [];
+            $privadas = [];
+            $juegos_por_box = [];
+
+            foreach ($box_ids as $box_id) {
+                $ocupacion[$box_id] = 0;
+                $privadas[$box_id] = false;
+                $juegos_por_box[$box_id] = [];
+            }
 
             foreach ($reservas as $reserva) {
                 $juego_actual = intval(get_post_meta($reserva->ID, 'juego_id', true));
@@ -100,55 +134,47 @@ class VR_Reservas_Frontend {
 
                 if (!is_array($boxes)) continue;
 
-                foreach ($boxes as $box) {
-                    if ($tipo_reserva === 'privada') {
-                        $privadas[$box] = true;
+                if ($tipo_reserva === 'privada') {
+                    foreach ($boxes as $box_id) {
+                        if (!in_array($box_id, $box_ids)) continue;
+                        $privadas[$box_id] = true;
                     }
-                    $ocupacion[$box] += $jugadores_reserva;
-                    if (!isset($ocupacion_por_juego[$box][$juego_actual])) {
-                        $ocupacion_por_juego[$box][$juego_actual] = 0;
+                } else {
+                    $jug_por_box = ceil($jugadores_reserva / count($boxes));
+                    foreach ($boxes as $index => $box_id) {
+                        if (!in_array($box_id, $box_ids)) continue;
+                        $uso = ($index === array_key_last($boxes)) ? $jugadores_reserva - ($jug_por_box * $index) : $jug_por_box;
+                        $ocupacion[$box_id] += $uso;
+                        $juegos_por_box[$box_id][$juego_actual] = true;
                     }
-                    $ocupacion_por_juego[$box][$juego_actual] += $jugadores_reserva;
                 }
             }
 
             if ($tipo === 'privada') {
-                if ($jugadores <= 4 && !$privadas['B'] && $ocupacion['B'] === 0) {
-                    $horas_disponibles[] = $franja;
-                } elseif ($jugadores <= 8 && !$privadas['A'] && $ocupacion['A'] === 0) {
-                    $horas_disponibles[] = $franja;
-                } elseif ($jugadores > 8 && !$privadas['A'] && !$privadas['B'] && $ocupacion['A'] === 0 && $ocupacion['B'] === 0) {
-                    $horas_disponibles[] = $franja;
+                $capacidad_libre = 0;
+                foreach ($boxes_data as $box_id => $box_info) {
+                    if (!$privadas[$box_id] && $ocupacion[$box_id] === 0) {
+                        $capacidad_libre += $box_info['capacidad'];
+                    }
+                }
+
+                if ($capacidad_libre >= $jugadores) {
+                    $horas_disponibles[] = ['hora' => $franja, 'plazas' => $capacidad_libre];
                 }
             } else {
-                $jugadores_restantes = $jugadores;
+                $capacidad_total = 0;
 
-                // Intentar rellenar primero boxes con mismo juego
-                foreach (["A", "B"] as $box) {
-                    if ($privadas[$box]) continue;
-
-                    $espacio = $capacidad[$box] - $ocupacion[$box];
-                    $juego_ya_en_box = isset($ocupacion_por_juego[$box][$juego_id]);
-
-                    if ($juego_ya_en_box && $espacio > 0) {
-                        $usar = min($jugadores_restantes, $espacio);
-                        $jugadores_restantes -= $usar;
+                foreach ($box_ids as $box_id) {
+                    if ($privadas[$box_id]) continue;
+                    $juegos_box = array_keys($juegos_por_box[$box_id]);
+                    $compatible = empty($juegos_box) || in_array($juego_id, $juegos_box);
+                    if ($compatible) {
+                        $capacidad_total += $boxes_data[$box_id]['capacidad'] - $ocupacion[$box_id];
                     }
                 }
 
-                // Intentar usar boxes vacíos
-                foreach (["A", "B"] as $box) {
-                    if ($jugadores_restantes <= 0) break;
-                    if ($privadas[$box]) continue;
-                    if ($ocupacion[$box] === 0) {
-                        $espacio = $capacidad[$box];
-                        $usar = min($jugadores_restantes, $espacio);
-                        $jugadores_restantes -= $usar;
-                    }
-                }
-
-                if ($jugadores_restantes <= 0) {
-                    $horas_disponibles[] = $franja;
+                if ($capacidad_total >= $jugadores) {
+                    $horas_disponibles[] = ['hora' => $franja, 'plazas' => $capacidad_total];
                 }
             }
         }
@@ -156,3 +182,5 @@ class VR_Reservas_Frontend {
         wp_send_json($horas_disponibles);
     }
 }
+
+VR_Reservas_Frontend::init();
